@@ -44,12 +44,85 @@ class TicketAdminPanel(Component):
 
     # IAdminPanelProvider methods
 
+    def generateReport(self, Project):
+        # Project = "yandex"
+        os.system("pwd")
+        try:
+            # print("qwe")
+            sqlite_connection = sqlite3.connect('***/trac.db') #Путь до бд
+            cursor = sqlite_connection.cursor()
+            print("База данных создана и успешно подключена к SQLite")
+
+            sqlite_select_query = "SELECT * FROM ticket WHERE component=='" + Project + "';"
+            cursor.execute(sqlite_select_query)
+            record = cursor.fetchall()
+
+            report = open("***/report.md", 'r') #Путь до шаблона 1
+            report_result = report.read().format(date=datetime.today().strftime('%Y-%m-%d'), app=Project,
+                                                 startDate=(datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d'))
+
+            for i in record:
+                # print("id:", i[0])
+                id = i[0]
+                # print("Project:", i[4])
+                Project = i[4]
+                # print("Summary:", i[14])
+                Summary = i[14]
+                # print("Description:", i[15])
+                Description = i[15]
+                query = "SELECT * FROM ticket_custom WHERE ticket=='%i';" % i[0]
+                # print(query)
+                cursor.execute(query)
+                add = cursor.fetchall()
+                print(add)
+                try:
+                    Example = add[1][2]
+                    Severity = add[2][2]
+                    Account = add[0][2]
+                    Url = add[3][2]
+                except:
+                    Severity = "Не указано"
+                    Example = "Примера нет"
+                    Account = "Не указано"
+                    Url = "Не указано"
+                # print("Severity:", add[2][2])
+                file = open('***/report_vuln.md', 'r') #Путь до шаблона 2 (с замечаниями)
+                s = file.read().format(summary=Summary, address=Url, description=Description, severity=Severity,
+                                       account=Account, example=Example)
+                file.close()
+
+                attachPathsQueries = "SELECT * FROM attachment WHERE id=='%i';" % id
+                cursor.execute(attachPathsQueries)
+                attaches = cursor.fetchall()
+                # print(attaches)
+                report_result += s
+                if attaches:
+                    report_result += "\n" + "![](http://127.0.0.1:8000/trac/attachment/ticket/" + str(id) + "/" + attaches[0][2] + ")\n" #link to attach (crap i know)
+                res_report = open("result-report-" + Project + '.md', 'w')
+                res_report.write(report_result)
+                res_report.close()
+                # print(s)
+                return s
+
+            report.close()
+            cursor.close()
+            return ("result-report-" + Project + '.md', s)
+
+        except sqlite3.Error as error:
+            print("Ошибка при подключении к sqlite", error)
+        finally:
+            if (sqlite_connection):
+                sqlite_connection.close()
+                print("Соединение с SQLite закрыто")
+    
     def get_admin_panels(self, req):
         if 'TICKET_ADMIN' in req.perm('admin', 'ticket/' + self._type):
             yield ('ticket', _('Ticket System'), self._type,
                    gettext(self._label[1]))
 
     def render_admin_panel(self, req, cat, page, path_info):
+        if (path_info != None) and ("generate-report" in path_info):
+            print(self.generateReport(path_info.split('/')[0]))
         # Trap AssertionErrors and convert them to TracErrors
         try:
             return self._render_admin_panel(req, cat, page, path_info)
@@ -82,7 +155,7 @@ class ComponentAdminPanel(TicketAdminPanel):
     _label = N_("Component"), N_("Components")
 
     # TicketAdminPanel methods
-
+    
     def _render_admin_panel(self, req, cat, page, component):
         # Detail view?
         if component:
