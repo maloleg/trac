@@ -66,6 +66,14 @@
       #   endmacro
 
       #   if view == 'detail':
+      
+      <div class="field">
+        <form action="./${component.name}/generate-report">
+          <button type="submit">Generate Report</button>
+
+        </form>
+      </div>
+      
       <form id="edit" class="mod" method="post" action="${req.request_path}">
         ${jmacros.form_token_input()}
         <fieldset>
